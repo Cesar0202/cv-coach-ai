@@ -75,27 +75,46 @@ export default function UploadSection() {
     }
   };
 
-  // API Call helper for Gemini
-  const callGemini = async (prompt) => {
+  // API Call helper for Gemini with automatic retries for high demand
+  const callGemini = async (prompt, retries = 3) => {
     const url = `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
     
     const body = {
       contents: [{ parts: [{ text: prompt }] }]
     };
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
 
-    if (!response.ok) {
-      const err = await response.json();
-      throw new Error(err.error?.message || 'Error al comunicarse con la API de Gemini');
+      if (!response.ok) {
+        const err = await response.json();
+        const errorMessage = err.error?.message || '';
+        
+        if (response.status === 429 || response.status === 503 || errorMessage.toLowerCase().includes('high demand')) {
+          if (retries > 0) {
+            console.warn(`Gemini API high demand. Retrying in 2.5 seconds... (${retries} retries left)`);
+            await new Promise(resolve => setTimeout(resolve, 2500));
+            return callGemini(prompt, retries - 1);
+          } else {
+            throw new Error('La IA está experimentando alta demanda. Por favor, espera unos momentos y vuelve a intentarlo.');
+          }
+        }
+        throw new Error(errorMessage || 'Error al comunicarse con la API de Gemini');
+      }
+
+      const data = await response.json();
+      return data.candidates[0].content.parts[0].text;
+    } catch (error) {
+      if (error.message === 'Failed to fetch' && retries > 0) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        return callGemini(prompt, retries - 1);
+      }
+      throw error;
     }
-
-    const data = await response.json();
-    return data.candidates[0].content.parts[0].text;
   };
 
   // Process manual text upload
@@ -193,7 +212,7 @@ export default function UploadSection() {
 
     } catch (error) {
       console.error("Gemini Error:", error);
-      setApiError('Ocurrió un error al conectar con el motor de IA. Por favor, reintenta.');
+      setApiError(error.message || 'Ocurrió un error al conectar con el motor de IA. Por favor, reintenta.');
       setStep('upload');
     }
   };
@@ -242,7 +261,7 @@ export default function UploadSection() {
     } catch (error) {
       console.error("Gemini Chat Error:", error);
       setIsTyping(false);
-      setChatMessages(prev => [...prev, { sender: 'ai', text: 'Disculpas, experimenté un error al procesar tu respuesta con el motor de IA. Por favor, reintenta.' }]);
+      setChatMessages(prev => [...prev, { sender: 'ai', text: error.message || 'Disculpas, experimenté un error al procesar tu respuesta con el motor de IA. Por favor, reintenta.' }]);
     }
   };
 
