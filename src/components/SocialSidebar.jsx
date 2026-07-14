@@ -1,11 +1,10 @@
 import React from 'react';
-import { Instagram, Linkedin, Twitter } from 'lucide-react';
+import { Github, Linkedin } from 'lucide-react';
 
 export default function SocialSidebar() {
   const socials = [
-    { icon: <Instagram size={18} />, url: 'https://instagram.com', label: 'Instagram' },
-    { icon: <Linkedin size={18} />, url: 'https://linkedin.com', label: 'LinkedIn' },
-    { icon: <Twitter size={18} />, url: 'https://twitter.com', label: 'X / Twitter' },
+    { icon: <Linkedin size={18} />, url: 'https://www.linkedin.com/in/cesar-huriarte/', label: 'LinkedIn' },
+    { icon: <Github size={18} />, url: 'https://github.com/Cesar0202/', label: 'GitHub' },
   ];
 
   return (

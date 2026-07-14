@@ -1,13 +1,11 @@
 import React from 'react';
-import { Instagram, Linkedin, Twitter, Github, Heart } from 'lucide-react';
+import { Linkedin, Github, Heart } from 'lucide-react';
 import Logo from '../assets/logo.svg';
 
 export default function Footer() {
   const socialLinks = [
-    { icon: <Instagram size={16} />, url: 'https://instagram.com', label: 'Instagram' },
-    { icon: <Linkedin size={16} />, url: 'https://linkedin.com', label: 'LinkedIn' },
-    { icon: <Twitter size={16} />, url: 'https://twitter.com', label: 'X' },
-    { icon: <Github size={16} />, url: 'https://github.com', label: 'GitHub' },
+    { icon: <Linkedin size={16} />, url: 'https://www.linkedin.com/in/cesar-huriarte/', label: 'LinkedIn' },
+    { icon: <Github size={16} />, url: 'https://github.com/Cesar0202/', label: 'GitHub' },
   ];
 
   const quickLinks = [
