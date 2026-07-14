@@ -3,6 +3,10 @@ import {
   Upload, FileText, CheckCircle2, Sparkles, RefreshCw, 
   Terminal, ArrowRight, Send, ArrowLeft, Bot, User, AlertCircle
 } from 'lucide-react';
+import * as pdfjsLib from 'pdfjs-dist';
+import mammoth from 'mammoth';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
 
 // Load Gemini API Key from Vite environment variables
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
@@ -129,61 +133,89 @@ export default function UploadSection() {
   // Start analysis processing
   const processFile = async (selectedFile) => {
     setFile(selectedFile);
-    processFileContent(selectedFile.name);
-  };
-
-  const processFileContent = async (inputSource) => {
     setStep('processing');
     setProcessingProgress(0);
     setCurrentCheckIndex(0);
     setApiError('');
+    
+    // Start processing checks animations
+    const progressInterval = setInterval(() => {
+      setProcessingProgress((prev) => (prev < 90 ? prev + 2 : prev));
+    }, 100);
+
+    const checkInterval = setInterval(() => {
+      setCurrentCheckIndex((prev) => (prev < 2 ? prev + 1 : prev));
+    }, 1500);
 
     try {
-      // Start processing checks animations
-      const progressInterval = setInterval(() => {
+      let extractedText = "";
+      const extension = selectedFile.name.split('.').pop().toLowerCase();
+      
+      try {
+        if (extension === 'pdf') {
+          const arrayBuffer = await selectedFile.arrayBuffer();
+          const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+          for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const content = await page.getTextContent();
+            extractedText += content.items.map(item => item.str).join(" ") + "\n";
+          }
+        } else if (['docx', 'doc'].includes(extension)) {
+          const arrayBuffer = await selectedFile.arrayBuffer();
+          const result = await mammoth.extractRawText({ arrayBuffer });
+          extractedText = result.value;
+        }
+      } catch (err) {
+        console.error("Extraction error:", err);
+        throw new Error("No pudimos extraer el texto de tu archivo. Asegúrate de que no esté encriptado y contenga texto legible.");
+      }
+
+      // Guardamos el texto extraído en el estado para que el simulador de chat tenga el contexto real
+      setCvText(extractedText);
+      await processFileContent(extractedText, progressInterval, checkInterval);
+    } catch (error) {
+      console.error("Error reading file:", error);
+      clearInterval(progressInterval);
+      clearInterval(checkInterval);
+      setApiError(error.message || "Hubo un error al leer tu archivo. Por favor, asegúrate de que sea un PDF o DOCX válido.");
+      setStep('upload');
+    }
+  };
+
+  const processFileContent = async (inputSource, passedProgressInterval = null, passedCheckInterval = null) => {
+    let progressInterval = passedProgressInterval;
+    let checkInterval = passedCheckInterval;
+
+    if (!progressInterval) {
+      setStep('processing');
+      setProcessingProgress(0);
+      setCurrentCheckIndex(0);
+      setApiError('');
+      
+      progressInterval = setInterval(() => {
         setProcessingProgress((prev) => (prev < 90 ? prev + 2 : prev));
       }, 100);
-
-      const checkInterval = setInterval(() => {
+      checkInterval = setInterval(() => {
         setCurrentCheckIndex((prev) => (prev < 2 ? prev + 1 : prev));
       }, 1500);
+    }
 
-      // Call Gemini to generate a custom assessment based on actual content or file name
-      const isManualText = uploadTab === 'text';
-      let prompt = "";
+    try {
+      // Ahora SIEMPRE le pasamos el texto real del currículum (ya sea extraído del archivo o pegado manualmente)
+      const prompt = `Analiza el siguiente texto de currículum profesional de un candidato y genera una evaluación real e interactiva.
+      Texto del CV:
+      ${inputSource}
       
-      if (isManualText) {
-        prompt = `Analiza el siguiente texto de currículum profesional de un candidato y genera una evaluación real e interactiva.
-        Texto del CV:
-        ${inputSource}
-        
-        Devuelve estrictamente un objeto JSON con la siguiente estructura (sin formato de código markdown extra, solo el objeto JSON plano):
-        {
-          "role": "Nombre del Rol (ej. Diseñador UI/UX, Desarrollador React, Especialista en Marketing, etc.)",
-          "score": un número entero de calificación de 0 a 100,
-          "scoreText": "Un párrafo corto de 2 líneas sugiriendo mejoras generales",
-          "strengths": ["punto fuerte 1", "punto fuerte 2", "punto fuerte 3"],
-          "weaknesses": ["punto débil 1", "punto débil 2", "punto débil 3"],
-          "keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5"],
-          "initialQuestion": "Una pregunta desafiante adaptada al rol para abrir la entrevista"
-        }`;
-      } else {
-        prompt = `Estamos en una simulación de carga de archivos para un portafolio web. No tienes acceso directo a la lectura de archivos locales.
-        El usuario ha subido un archivo de currículum llamado "${inputSource}".
-        Tu tarea es inferir de manera creativa el rol profesional más probable que corresponde a ese nombre de archivo (por ejemplo, si contiene 'Cesar' infiere un rol de desarrollo de software como Full-Stack o Frontend, o el rol que sugiera el nombre de archivo).
-        Inventa y estima lógicamente datos consistentes con ese rol.
-        
-        Devuelve estrictamente un objeto JSON con la siguiente estructura (sin formato de código markdown extra, solo el objeto JSON plano). NO digas que no tienes acceso al archivo, tu objetivo es inventar el perfil para la simulación basándote únicamente en el nombre de archivo de forma coherente:
-        {
-          "role": "Nombre del Rol (ej. Diseñador UI/UX, Desarrollador React, Especialista en Marketing, etc.)",
-          "score": un número entero de calificación estimado (entre 75 y 95),
-          "scoreText": "Un párrafo corto de 2 líneas sugiriendo mejoras generales para ese tipo de currículum",
-          "strengths": ["punto fuerte estimado 1", "punto fuerte estimado 2", "punto fuerte estimado 3"],
-          "weaknesses": ["punto débil estimado 1", "punto débil estimado 2", "punto débil estimado 3"],
-          "keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5"],
-          "initialQuestion": "Una pregunta desafiante adaptada al rol inferido para abrir la entrevista"
-        }`;
-      }
+      Devuelve estrictamente un objeto JSON con la siguiente estructura (sin formato de código markdown extra, solo el objeto JSON plano):
+      {
+        "role": "Nombre del Rol (ej. Diseñador UI/UX, Desarrollador React, Especialista en Marketing, etc.)",
+        "score": un número entero de calificación de 0 a 100,
+        "scoreText": "Un párrafo corto de 2 líneas sugiriendo mejoras generales",
+        "strengths": ["punto fuerte 1", "punto fuerte 2", "punto fuerte 3"],
+        "weaknesses": ["punto débil 1", "punto débil 2", "punto débil 3"],
+        "keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5"],
+        "initialQuestion": "Una pregunta desafiante adaptada al rol para abrir la entrevista"
+      }`;
 
       const aiResponseText = await callGemini(prompt);
       let cleanedText = aiResponseText.trim();
@@ -212,6 +244,8 @@ export default function UploadSection() {
 
     } catch (error) {
       console.error("Gemini Error:", error);
+      clearInterval(progressInterval);
+      clearInterval(checkInterval);
       setApiError(error.message || 'Ocurrió un error al conectar con el motor de IA. Por favor, reintenta.');
       setStep('upload');
     }
@@ -234,10 +268,7 @@ export default function UploadSection() {
         `${msg.sender === 'user' ? 'Candidato' : 'Entrevistador (IA)'}: ${msg.text}`
       ).join('\n');
 
-      const isManualText = uploadTab === 'text';
-      const cvContext = isManualText 
-        ? `Contenido real del CV del candidato:\n${cvText}`
-        : `El candidato subió un archivo llamado: "${file?.name || 'currículum.pdf'}".\nRol inferido: ${report.role}\nFortalezas: ${report.strengths.join(', ')}\nÁreas de mejora: ${report.weaknesses.join(', ')}\nPalabras clave: ${report.keywords.join(', ')}`;
+      const cvContext = `Contenido real del CV del candidato:\n${cvText}\n\nEvaluación inicial:\nRol: ${report.role}\nFortalezas: ${report.strengths.join(', ')}\nÁreas de mejora: ${report.weaknesses.join(', ')}\nPalabras clave: ${report.keywords.join(', ')}`;
 
       const prompt = `Actúas como un entrevistador profesional senior para el rol de ${report.role}.
       Estás evaluando al candidato en una entrevista simulada basada en su currículum.
