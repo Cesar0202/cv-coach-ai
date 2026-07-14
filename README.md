@@ -47,13 +47,3 @@ Siga los siguientes pasos para ejecutar el proyecto en su entorno de desarrollo 
    npm run build
    ```
 
-## Despliegue en Vercel
-
-Para desplegar este proyecto en Vercel, siga estos pasos:
-
-1. Suba el código a su repositorio en GitHub (el archivo `.env` se omitirá automáticamente por estar registrado en el archivo `.gitignore`).
-2. Importe el proyecto desde el panel de control de Vercel.
-3. En la sección de configuración de variables de entorno (Environment Variables), añada la clave:
-   * **Nombre**: `VITE_GEMINI_API_KEY`
-   * **Valor**: `su_api_key_de_gemini`
-4. Complete el despliegue haciendo clic en **Deploy**.
