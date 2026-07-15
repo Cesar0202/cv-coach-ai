@@ -74,7 +74,7 @@ export default function Hero() {
           {/* Metric 1 */}
           <div className="flex flex-col">
             <div className="flex items-center mb-2">
-              <span className="text-4xl md:text-5xl font-display font-bold text-brand-text">95%</span>
+              <span className="text-4xl md:text-5xl font-display font-bold text-brand-text">Alta</span>
             </div>
             <h3 className="text-xs font-bold uppercase tracking-wider text-brand-text mb-1">
               Precisión de Feedback
@@ -87,7 +87,7 @@ export default function Hero() {
           {/* Metric 2 */}
           <div className="flex flex-col">
             <div className="flex items-center mb-2">
-              <span className="text-4xl md:text-5xl font-display font-bold text-brand-text">15m</span>
+              <span className="text-4xl md:text-5xl font-display font-bold text-brand-text">IA</span>
             </div>
             <h3 className="text-xs font-bold uppercase tracking-wider text-brand-text mb-1">
               Simulador Realista
